@@ -1,5 +1,7 @@
 package edu.udacity.java.nano.chat;
 
+import com.alibaba.fastjson.JSON;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import org.springframework.stereotype.Component;
 
 import javax.websocket.*;
@@ -15,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 
 @Component
-@ServerEndpoint("/chat")
+@ServerEndpoint(value = "/chat")
 public class WebSocketChatServer {
 
     /**
@@ -24,7 +26,13 @@ public class WebSocketChatServer {
     private static Map<String, Session> onlineSessions = new ConcurrentHashMap<>();
 
     private static void sendMessageToAll(String msg) {
-        //TODO: add send message method.
+        for (Map.Entry<String, Session> e : onlineSessions.entrySet()) {
+            try {
+                e.getValue().getBasicRemote().sendText(msg);
+            } catch (Exception exception) {
+                System.out.println("ERROR: " + exception.getMessage());
+            }
+        }
     }
 
     /**
@@ -32,7 +40,8 @@ public class WebSocketChatServer {
      */
     @OnOpen
     public void onOpen(Session session) {
-        //TODO: add on open connection.
+        System.out.println("session: open " + session.getId());
+        onlineSessions.put(session.getId(), session);
     }
 
     /**
@@ -40,7 +49,14 @@ public class WebSocketChatServer {
      */
     @OnMessage
     public void onMessage(Session session, String jsonStr) {
-        //TODO: add send message.
+        System.out.println("RECV: " + jsonStr);
+        Message message = JSON.parseObject(jsonStr, Message.class);
+        if (message.getType().equals(Message.CONNECT)) {
+            message.setOnlineCount(onlineSessions.size());
+        } else if (message.getType().equals(Message.DISCONNECT)) {
+            message.setOnlineCount(onlineSessions.size() - 1);
+        }
+        sendMessageToAll(JSON.toJSONString(message));
     }
 
     /**
@@ -48,7 +64,8 @@ public class WebSocketChatServer {
      */
     @OnClose
     public void onClose(Session session) {
-        //TODO: add close connection.
+        onlineSessions.remove(session.getId());
+
     }
 
     /**
